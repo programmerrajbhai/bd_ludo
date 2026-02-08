@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 
 class BoardPainter extends CustomPainter {
-  final List<Map<String, dynamic>> tokenDraw; // [{color, x, y, glow}]
+  final List<Map<String, dynamic>> tokenDraw; 
   final Set<int> safeCells;
 
   BoardPainter({
@@ -14,191 +14,169 @@ class BoardPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.shortestSide;
-    final cell = s / grid;
+    final cell = s / 15; // 15x15 Grid standard
 
-    final offsetX = (size.width - s) / 2;
-    final offsetY = (size.height - s) / 2;
+    // 1. White Background Base
+    final bgPaint = Paint()..color = Colors.white;
+    canvas.drawRect(Rect.fromLTWH(0, 0, s, s), bgPaint);
 
-    canvas.save();
-    canvas.translate(offsetX, offsetY);
+    // 2. Draw Colored Homes (4 Corners)
+    _drawHomeBase(canvas, cell, 0, 0, red);       // Top-Left (Red)
+    _drawHomeBase(canvas, cell, 9, 0, green);     // Top-Right (Green)
+    _drawHomeBase(canvas, cell, 0, 9, blue);      // Bottom-Left (Blue)
+    _drawHomeBase(canvas, cell, 9, 9, yellow);    // Bottom-Right (Yellow)
 
-    final r = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, s, s), const Radius.circular(18));
-
-    // board base
-    canvas.drawRRect(
-      r,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFFFFFFFF), Color(0xFFF2F6FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(Rect.fromLTWH(0, 0, s, s)),
-    );
-
-    // subtle pattern
-    final pat = Paint()..color = const Color(0x11000000);
-    for (double y = 10; y < s; y += cell * 1.15) {
-      for (double x = 10; x < s; x += cell * 1.15) {
-        canvas.drawCircle(Offset(x, y), 1.2, pat);
-      }
-    }
-
-    // quadrants (home blocks)
-    _homeBlock(canvas, cell, 0, 0, red);
-    _homeBlock(canvas, cell, 9, 0, green);
-    _homeBlock(canvas, cell, 0, 9, blue);
-    _homeBlock(canvas, cell, 9, 9, yellow);
-
-    // track tiles
-    final stroke = Paint()
+    // 3. Draw Grid Lines (Black Thin Lines)
+    final linePaint = Paint()
+      ..color = Colors.black
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = const Color(0x22000000);
+      ..strokeWidth = 1.0;
 
-    for (final p in track) {
-      final rect = Rect.fromLTWH(p.dx * cell, p.dy * cell, cell, cell);
-      canvas.drawRect(rect, Paint()..color = Colors.white);
-      canvas.drawRect(rect, stroke);
-    }
+    // Drawing the main cross tracks borders
+    // Vertical Tracks
+    canvas.drawRect(Rect.fromLTWH(6*cell, 0, 3*cell, 6*cell), linePaint); // Top
+    canvas.drawRect(Rect.fromLTWH(6*cell, 9*cell, 3*cell, 6*cell), linePaint); // Bottom
+    // Horizontal Tracks
+    canvas.drawRect(Rect.fromLTWH(0, 6*cell, 6*cell, 3*cell), linePaint); // Left
+    canvas.drawRect(Rect.fromLTWH(9*cell, 6*cell, 6*cell, 3*cell), linePaint); // Right
+    
+    // Draw internal cells
+    _drawCells(canvas, cell, linePaint);
 
-    // color lanes (center cross)
-    for (int x = 1; x <= 5; x++) _fillCell(canvas, cell, x, 7, red.withOpacity(.85));
-    for (int y = 1; y <= 5; y++) _fillCell(canvas, cell, 7, y, green.withOpacity(.85));
-    for (int x = 9; x <= 13; x++) _fillCell(canvas, cell, x, 7, yellow.withOpacity(.85));
-    for (int y = 9; y <= 13; y++) _fillCell(canvas, cell, 7, y, blue.withOpacity(.85));
+    // 4. Draw Colored Paths (Home Stretches - The "Red/Green Lines")
+    _fillPath(canvas, cell, 1, 7, 5, 1, red);    // Red Strip
+    _fillPath(canvas, cell, 7, 1, 1, 5, green);  // Green Strip
+    _fillPath(canvas, cell, 7, 9, 1, 5, blue);   // Blue Strip
+    _fillPath(canvas, cell, 9, 7, 5, 1, yellow); // Yellow Strip
 
-    // home stretches
-    homeStretch.forEach((c, path) {
-      for (final p in path) {
-        _fillCell(canvas, cell, p.dx.toInt(), p.dy.toInt(), colorOf(c).withOpacity(.92));
-      }
-    });
+    // 5. Center Triangle (Winner's Spot)
+    _drawCenter(canvas, cell);
 
-    _centerTriangles(canvas, cell);
+    // 6. Start Squares (Highlight the starting box on track)
+    _fillCell(canvas, cell, 1, 6, red);
+    _fillCell(canvas, cell, 8, 1, green);
+    _fillCell(canvas, cell, 6, 13, blue);
+    _fillCell(canvas, cell, 13, 8, yellow);
 
-    // safe stars
-    for (final idx in safeCells) {
-      final p = track[idx];
-      _star(canvas, Offset((p.dx + .5) * cell, (p.dy + .5) * cell), cell * .19);
-    }
-
-    // tokens
+    // 7. Safe Stars
+    // Manually placing stars on standard safe spots
+    _drawStar(canvas, cell, 2, 6); // Red safe
+    _drawStar(canvas, cell, 6, 2); // Green safe
+    _drawStar(canvas, cell, 8, 12); // Blue safe
+    _drawStar(canvas, cell, 12, 8); // Yellow safe
+    
+    // 8. Draw Tokens (Guti)
     for (final t in tokenDraw) {
       final col = t['color'] as Color;
       final x = t['x'] as double;
       final y = t['y'] as double;
       final glow = (t['glow'] ?? false) as bool;
-      _token(canvas, Offset((x + .5) * cell, (y + .5) * cell), cell * .34, col, glow);
+      _drawToken(canvas, Offset((x + .5) * cell, (y + .5) * cell), cell * .35, col, glow);
     }
-
-    // border
-    canvas.drawRRect(
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = const Color(0x33000000),
-    );
-
-    canvas.restore();
   }
 
-  void _homeBlock(Canvas c, double cell, int x0, int y0, Color col) {
-    for (int y = y0; y < y0 + 6; y++) {
-      for (int x = x0; x < x0 + 6; x++) {
-        _fillCell(c, cell, x, y, col.withOpacity(.95));
-      }
-    }
-    for (int y = y0 + 1; y < y0 + 5; y++) {
-      for (int x = x0 + 1; x < x0 + 5; x++) {
-        _fillCell(c, cell, x, y, Colors.white);
-      }
-    }
-    final dots = [
-      Offset(x0 + 2.3, y0 + 2.3),
-      Offset(x0 + 3.7, y0 + 2.3),
-      Offset(x0 + 2.3, y0 + 3.7),
-      Offset(x0 + 3.7, y0 + 3.7),
+  void _drawHomeBase(Canvas c, double cell, int x, int y, Color color) {
+    // Large colored box
+    c.drawRect(Rect.fromLTWH(x*cell, y*cell, 6*cell, 6*cell), Paint()..color = color);
+    
+    // Inner white box
+    c.drawRect(Rect.fromLTWH((x+1)*cell, (y+1)*cell, 4*cell, 4*cell), Paint()..color = Colors.white);
+
+    // 4 Token Circles inside
+    final circlePaint = Paint()..color = color;
+    final borderPaint = Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 1;
+    
+    List<Offset> spots = [
+       Offset((x+1.5)*cell, (y+1.5)*cell),
+       Offset((x+4.5)*cell, (y+1.5)*cell),
+       Offset((x+1.5)*cell, (y+4.5)*cell),
+       Offset((x+4.5)*cell, (y+4.5)*cell),
     ];
-    final p = Paint()..color = col;
-    for (final d in dots) {
-      c.drawCircle(Offset(d.dx * cell, d.dy * cell), cell * .30, p);
+
+    for(var s in spots) {
+      c.drawCircle(s, cell*0.6, Paint()..color = Colors.white); // Circle bg
+      c.drawCircle(s, cell*0.6, borderPaint); // Circle border
+      c.drawCircle(s, cell*0.4, circlePaint); // Inner color
     }
   }
 
-  void _fillCell(Canvas c, double cell, int x, int y, Color col) {
-    final rect = Rect.fromLTWH(x * cell, y * cell, cell, cell);
-    c.drawRect(rect, Paint()..color = col);
-    c.drawRect(rect, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = const Color(0x22000000));
+  void _fillPath(Canvas c, double cell, int x, int y, int w, int h, Color color) {
+    c.drawRect(Rect.fromLTWH(x*cell, y*cell, w*cell, h*cell), Paint()..color = color);
+    
+    // Draw grid lines over the color
+    final p = Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 1;
+    for(int i=0; i<=w; i++) c.drawLine(Offset((x+i)*cell, y*cell), Offset((x+i)*cell, (y+h)*cell), p);
+    for(int i=0; i<=h; i++) c.drawLine(Offset(x*cell, (y+i)*cell), Offset((x+w)*cell, (y+i)*cell), p);
   }
 
-  void _centerTriangles(Canvas c, double cell) {
-    final cx = 7.5 * cell, cy = 7.5 * cell;
-
-    void tri(Offset a, Offset b, Color col) {
-      final path = Path()
-        ..moveTo(cx, cy)
-        ..lineTo(a.dx, a.dy)
-        ..lineTo(b.dx, b.dy)
-        ..close();
-      c.drawPath(path, Paint()..color = col.withOpacity(.95));
-      c.drawPath(path, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = const Color(0x22000000));
-    }
-
-    tri(Offset(6 * cell, 6 * cell), Offset(9 * cell, 6 * cell), green);
-    tri(Offset(9 * cell, 6 * cell), Offset(9 * cell, 9 * cell), yellow);
-    tri(Offset(9 * cell, 9 * cell), Offset(6 * cell, 9 * cell), blue);
-    tri(Offset(6 * cell, 9 * cell), Offset(6 * cell, 6 * cell), red);
+  void _fillCell(Canvas c, double cell, int x, int y, Color color) {
+    c.drawRect(Rect.fromLTWH(x*cell, y*cell, cell, cell), Paint()..color = color);
+    c.drawRect(Rect.fromLTWH(x*cell, y*cell, cell, cell), Paint()..color = Colors.black..style=PaintingStyle.stroke..strokeWidth=1);
   }
 
-  void _star(Canvas c, Offset center, double r) {
-    const spikes = 5;
-    final path = Path();
-    double rot = math.pi / 2 * 3;
-    final step = math.pi / spikes;
+  void _drawCells(Canvas c, double cell, Paint p) {
+    // Simple loop to draw grid on tracks
+    // Top Track
+    for(int i=6; i<9; i++) for(int j=0; j<6; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
+    // Bottom Track
+    for(int i=6; i<9; i++) for(int j=9; j<15; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
+    // Left Track
+    for(int i=0; i<6; i++) for(int j=6; j<9; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
+    // Right Track
+    for(int i=9; i<15; i++) for(int j=6; j<9; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
+  }
 
-    path.moveTo(center.dx, center.dy - r);
-    for (int i = 0; i < spikes; i++) {
-      path.lineTo(center.dx + math.cos(rot) * r, center.dy + math.sin(rot) * r);
-      rot += step;
-      path.lineTo(center.dx + math.cos(rot) * (r * .45), center.dy + math.sin(rot) * (r * .45));
-      rot += step;
-    }
+  void _drawCenter(Canvas c, double cell) {
+    final cx = 7.5 * cell;
+    final cy = 7.5 * cell;
+    
+    // Center Triangle Path
+    Path path = Path();
+    path.moveTo(6*cell, 6*cell);
+    path.lineTo(9*cell, 6*cell);
+    path.lineTo(9*cell, 9*cell);
+    path.lineTo(6*cell, 9*cell);
     path.close();
+    
+    // Draw 4 colored triangles
+    // Red (Left)
+    c.drawPath(Path()..moveTo(cx, cy)..lineTo(6*cell, 6*cell)..lineTo(6*cell, 9*cell)..close(), Paint()..color = red);
+    // Green (Top)
+    c.drawPath(Path()..moveTo(cx, cy)..lineTo(6*cell, 6*cell)..lineTo(9*cell, 6*cell)..close(), Paint()..color = green);
+    // Yellow (Right)
+    c.drawPath(Path()..moveTo(cx, cy)..lineTo(9*cell, 6*cell)..lineTo(9*cell, 9*cell)..close(), Paint()..color = yellow);
+    // Blue (Bottom)
+    c.drawPath(Path()..moveTo(cx, cy)..lineTo(6*cell, 9*cell)..lineTo(9*cell, 9*cell)..close(), Paint()..color = blue);
 
-    c.drawPath(path, Paint()..color = Colors.white.withOpacity(.85));
-    c.drawPath(path, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..color = const Color(0x33000000));
+    // Border
+    c.drawRect(Rect.fromLTWH(6*cell, 6*cell, 3*cell, 3*cell), Paint()..style=PaintingStyle.stroke..color=Colors.black..strokeWidth=1.5);
   }
 
-  void _token(Canvas c, Offset center, double r, Color col, bool glow) {
+  void _drawStar(Canvas c, double cell, int x, int y) {
+    final cx = (x + 0.5) * cell;
+    final cy = (y + 0.5) * cell;
+    // Simple star icon using text or path
+    TextSpan span = TextSpan(style: TextStyle(color: Colors.grey[700], fontSize: cell*0.8, fontFamily: 'MaterialIcons'), text: String.fromCharCode(Icons.star.codePoint));
+    TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
+    tp.layout();
+    tp.paint(c, Offset(cx - tp.width/2, cy - tp.height/2));
+  }
+
+  void _drawToken(Canvas c, Offset center, double r, Color col, bool glow) {
     if (glow) {
-      c.drawCircle(center, r * 1.25, Paint()..color = const Color(0xFFF7C62F).withOpacity(.35));
+      c.drawCircle(center, r * 1.3, Paint()..color = Colors.white.withOpacity(0.5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
     }
-    c.drawCircle(center, r, Paint()..color = Colors.white);
-    c.drawCircle(center, r, Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = const Color(0x33000000));
-
-    c.drawCircle(Offset(center.dx, center.dy - r * .05), r * .55, Paint()..color = col);
-
-    final path = Path()
-      ..moveTo(center.dx, center.dy + r * .85)
-      ..quadraticBezierTo(center.dx - r * .65, center.dy + r * .15, center.dx, center.dy - r * .1)
-      ..quadraticBezierTo(center.dx + r * .65, center.dy + r * .15, center.dx, center.dy + r * .85)
-      ..close();
-    c.drawPath(path, Paint()..color = col);
-
-    c.drawCircle(Offset(center.dx - r * .18, center.dy - r * .35), r * .18, Paint()..color = Colors.white.withOpacity(.55));
+    // Shadow
+    c.drawCircle(Offset(center.dx+2, center.dy+2), r, Paint()..color = Colors.black26);
+    
+    // Main Body
+    c.drawCircle(center, r, Paint()..color = col);
+    
+    // Border
+    c.drawCircle(center, r, Paint()..style=PaintingStyle.stroke..color=Colors.white..strokeWidth=2);
+    
+    // Inner bevel highlight
+    c.drawCircle(Offset(center.dx - r*0.2, center.dy - r*0.2), r*0.3, Paint()..color = Colors.white24);
   }
 
   @override

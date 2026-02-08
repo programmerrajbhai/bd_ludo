@@ -21,7 +21,6 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    // keyboard space roll
     WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
 
@@ -34,123 +33,187 @@ class _GameScreenState extends State<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final eng = context.watch<GameEngine>();
-    final cur = eng.cur();
 
     return Scaffold(
+      backgroundColor: const Color(0xFF18191A), // Dark Theme Background
       body: SafeArea(
         child: Focus(
           focusNode: _focus,
           onKeyEvent: (_, e) {
             if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.space) {
-              eng.rollDice();
+              if (!eng.rolled && eng.winner == null) eng.rollDice();
               return KeyEventResult.handled;
             }
             return KeyEventResult.ignored;
           },
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1100),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: LayoutBuilder(
-                  builder: (_, box) {
-                    final wide = box.maxWidth > 980;
-                    return Column(
-                      children: [
-                        _topBar(context, eng),
-                        const SizedBox(height: 12),
-                        Expanded(
-                          child: wide
-                              ? Row(
+          child: Column(
+            children: [
+              // 1. Top Bar
+              _buildTopBar(context, eng),
+              
+              // 2. Main Game Area
+              Expanded(
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: 0.65, // Portrait mode aspect ratio
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final boardSize = constraints.maxWidth * 0.90;
+                        
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // --- The Ludo Board ---
+                            SizedBox(
+                              width: boardSize,
+                              height: boardSize,
+                              child: _buildBoard(context, eng),
+                            ),
+
+                            // --- 4 Players Corners ---
+                            
+                            // Player 0 (Red) - Top Left
+                            if (eng.players.isNotEmpty)
+                              Positioned(
+                                top: 10, left: 10,
+                                child: _PlayerProfile(eng: eng, index: 0),
+                              ),
+
+                            // Player 1 (Green) - Top Right
+                            if (eng.players.length > 1)
+                              Positioned(
+                                top: 10, right: 10,
+                                child: _PlayerProfile(eng: eng, index: 1),
+                              ),
+
+                            // Player 2 (Yellow) - Bottom Right
+                            if (eng.players.length > 2)
+                              Positioned(
+                                bottom: 10, right: 10,
+                                child: _PlayerProfile(eng: eng, index: 2),
+                              ),
+
+                            // Player 3 (Blue) - Bottom Left
+                            if (eng.players.length > 3)
+                              Positioned(
+                                bottom: 10, left: 10,
+                                child: _PlayerProfile(eng: eng, index: 3),
+                              ),
+
+                            // --- Winner Dialog Overlay ---
+                            if (eng.winner != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.amber, width: 3),
+                                  boxShadow: const [BoxShadow(color: Colors.black, blurRadius: 20)],
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Expanded(child: _boardCard(context, eng)),
-                                    const SizedBox(width: 12),
-                                    SizedBox(width: 360, child: _sideCard(context, eng)),
-                                  ],
-                                )
-                              : Column(
-                                  children: [
-                                    Expanded(child: _boardCard(context, eng)),
-                                    const SizedBox(height: 12),
-                                    _sideCard(context, eng),
+                                    const Icon(Icons.emoji_events, color: Colors.amber, size: 50),
+                                    const SizedBox(height: 10),
+                                    Text("WINNER: ${eng.winner}", 
+                                      style: const TextStyle(color: Colors.amber, fontSize: 22, fontWeight: FontWeight.bold)
+                                    ),
+                                    const SizedBox(height: 15),
+                                    ElevatedButton(
+                                      onPressed: () => eng.exitGame(),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                                      child: const Text("Exit Game", style: TextStyle(color: Colors.white)),
+                                    )
                                   ],
                                 ),
-                        ),
-                      ],
-                    );
-                  },
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
-            ),
+
+              // 3. Bottom Status
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                decoration: const BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(15))
+                ),
+                child: Text(
+                  eng.winner == null ? "Turn: ${eng.cur().name}" : "Game Over",
+                  style: TextStyle( fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _topBar(BuildContext context, GameEngine eng) {
-    return Row(
-      children: [
-        InkWell(
-          onTap: () => eng.exitGame(),
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              color: Colors.black.withOpacity(.18),
-              border: Border.all(color: Colors.white.withOpacity(.16)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.arrow_back_rounded, size: 18),
-                SizedBox(width: 6),
-                Text("Back", style: TextStyle(fontWeight: FontWeight.w900)),
-              ],
+  Widget _buildTopBar(BuildContext context, GameEngine eng) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          InkWell(
+            onTap: () => eng.exitGame(),
+            borderRadius: BorderRadius.circular(50),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.white12, shape: BoxShape.circle),
+              child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            eng.mode,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-            overflow: TextOverflow.ellipsis,
+          Text(
+            "BD LUDO",
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.5),
           ),
-        ),
-        IconButton(
-          onPressed: () => showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => const SettingsSheet(),
+          InkWell(
+            onTap: () => showModalBottomSheet(
+              context: context,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const SettingsSheet(),
+            ),
+            borderRadius: BorderRadius.circular(50),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.white12, shape: BoxShape.circle),
+              child: const Icon(Icons.settings, color: Colors.white),
+            ),
           ),
-          icon: const Icon(Icons.tune_rounded),
-        )
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _boardCard(BuildContext context, GameEngine eng) {
-    // Build token draw positions (grid positions)
+  Widget _buildBoard(BuildContext context, GameEngine eng) {
     final draw = <Map<String, dynamic>>[];
-
+    
+    // Loop through players to draw tokens
     for (int pi = 0; pi < eng.players.length; pi++) {
       final p = eng.players[pi];
-      final col = colorOf(p.color);
+      final col = colorOf(p.color); // Using new colorOf(int)
 
       for (int ti = 0; ti < 4; ti++) {
         final t = p.tokens[ti];
         if (t.finished) continue;
 
-        // determine grid coordinate
         Offset g;
+        // Determine Grid Position
         if (t.pos == -1) {
-          g = homeYard[p.color]![ti];
+          // Inside Home Yard
+          g = homeYard[p.color]![ti]; 
         } else if (t.pos >= 0 && t.pos < 52) {
+          // On Track
           g = track[t.pos];
         } else {
-          // home stretch 100..105
+          // On Home Stretch
           final idx = (t.pos - 100).clamp(0, 5);
           g = homeStretch[p.color]![idx];
         }
@@ -161,12 +224,10 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        color: Colors.black.withOpacity(.18),
-        border: Border.all(color: Colors.white.withOpacity(.14)),
-        boxShadow: const [BoxShadow(blurRadius: 55, offset: Offset(0, 18), color: Color(0x55000000))],
+        color: Colors.white, // Board Base
+        borderRadius: BorderRadius.circular(4),
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 15, spreadRadius: 2)],
       ),
       child: LayoutBuilder(
         builder: (_, box) {
@@ -175,12 +236,10 @@ class _GameScreenState extends State<GameScreen> {
             onTapUp: (d) {
               if (!eng.rolled || eng.moving || eng.winner != null) return;
               final local = d.localPosition;
-
               final cell = s / grid;
               final gx = (local.dx / cell).floor();
               final gy = (local.dy / cell).floor();
 
-              // find token hit
               for (final td in draw.reversed) {
                 if ((td['x'] as double).round() == gx && (td['y'] as double).round() == gy) {
                   final pi = td['pi'] as int;
@@ -188,7 +247,7 @@ class _GameScreenState extends State<GameScreen> {
                   if (pi == eng.turn && eng.movable.contains(ti)) {
                     eng.moveToken(ti);
                   } else if (pi == eng.turn && eng.rolled) {
-                    Toasty.show(context, "এই টোকেন move করা যাবে না");
+                    Toasty.show(context, "Invalid Move");
                   }
                   return;
                 }
@@ -206,116 +265,96 @@ class _GameScreenState extends State<GameScreen> {
       ),
     );
   }
+}
 
-  Widget _sideCard(BuildContext context, GameEngine eng) {
-    final p = eng.cur();
-    final dotColor = colorOf(p.color);
+// --- Player Profile & Dice Widget ---
+class _PlayerProfile extends StatelessWidget {
+  final GameEngine eng;
+  final int index;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        color: Colors.black.withOpacity(.18),
-        border: Border.all(color: Colors.white.withOpacity(.14)),
-        boxShadow: const [BoxShadow(blurRadius: 55, offset: Offset(0, 18), color: Color(0x55000000))],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(children: [
-            Container(width: 14, height: 14, decoration: BoxDecoration(color: dotColor, borderRadius: BorderRadius.circular(99))),
-            const SizedBox(width: 10),
-            Expanded(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
-            if (p.team != null)
+  const _PlayerProfile({required this.eng, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    if (index >= eng.players.length) return const SizedBox();
+
+    final player = eng.players[index];
+    final isMyTurn = eng.turn == index;
+    final color = colorOf(player.color);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Profile Box
+        Container(
+          width: 65,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: isMyTurn ? color.withOpacity(0.3) : Colors.black45,
+            borderRadius: BorderRadius.circular(12),
+            border: isMyTurn ? Border.all(color: color, width: 2) : Border.all(color: Colors.white12),
+          ),
+          child: Column(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  color: Colors.white.withOpacity(.10),
-                  border: Border.all(color: Colors.white.withOpacity(.14)),
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1)),
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: color,
+                  child: const Icon(Icons.person, color: Colors.white, size: 20),
                 ),
-                child: Text("Team ${p.team}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, color: Color(0xFFB8D6FF))),
               ),
-          ]),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    color: Colors.white.withOpacity(.10),
-                    border: Border.all(color: Colors.white.withOpacity(.14)),
-                  ),
-                  child: Text(
-                    eng.winner != null
-                        ? "WINNER: ${eng.winner}"
-                        : eng.rolled
-                            ? (eng.movable.isEmpty ? "No moves. Next turn…" : "Choose a token")
-                            : "Tap dice to ROLL (Space)",
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Color(0xFFB8D6FF)),
-                  ),
-                ),
+              const SizedBox(height: 4),
+              Text(
+                player.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              DiceWidget(
-                value: eng.dice,
-                rolling: eng.rolled && eng.dice == 0, // not used, but kept
-                onTap: () => eng.rollDice(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  children: [
-                    ElevatedButton(
-                      onPressed: eng.winner != null ? null : () => eng.rollDice(),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Text("ROLL", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: .6)),
+        ),
+
+        const SizedBox(height: 6),
+
+        // Dice Box
+        SizedBox(
+          width: 50,
+          height: 50,
+          child: IgnorePointer(
+            ignoring: !isMyTurn || eng.moving || eng.winner != null,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Glow Animation
+                if (isMyTurn && !eng.rolled)
+                  Container(
+                    width: 50, height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [BoxShadow(color: color.withOpacity(0.8), blurRadius: 15, spreadRadius: 1)],
                     ),
-                    const SizedBox(height: 10),
-                    OutlinedButton(
-                      onPressed: () => eng.exitGame(),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: BorderSide(color: Colors.white.withOpacity(.18)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: const Text("EXIT", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: .6)),
-                    ),
-                  ],
+                  ),
+                
+                // The Dice
+                Opacity(
+                  opacity: isMyTurn ? 1.0 : 0.5,
+                  child: DiceWidget(
+                    value: isMyTurn ? eng.dice : (eng.turn == index ? eng.dice : 0),
+                    rolling: isMyTurn && eng.isRolling,
+                    onTap: () {
+                       if (isMyTurn && !eng.rolled && eng.winner == null) {
+                         eng.rollDice();
+                       }
+                    },
+                  ),
                 ),
-              )
-            ],
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                color: Colors.black.withOpacity(.18),
-                border: Border.all(color: Colors.white.withOpacity(.14)),
-              ),
-              child: Text(
-                "Turn: ${eng.turn + 1}/${eng.players.length}\n"
-                "Dice: ${eng.dice}\n"
-                "Movable tokens: ${eng.movable.length}\n"
-                "Rules: 6 to start, safe stars, capture, home stretch\n",
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, height: 1.5, color: Color(0xFFB8D6FF)),
-              ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
