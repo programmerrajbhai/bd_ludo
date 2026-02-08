@@ -13,13 +13,13 @@ const bg1 = Color.fromARGB(255, 140, 143, 146);
 const bg2 = Color(0xFF0B5FB3);
 
 // --- UI Colors ---
-const appBg = Color(0xFF18191A);
-const boardBase = Colors.white;
-const boardLines = Colors.black;
-const winnerColor = Colors.amber;
-const uiHighlight = Colors.white12;
-const textDim = Colors.white54;
-const shadowColor = Colors.black54;
+const appBg = Color(0xFF18191A); 
+const boardBase = Colors.white; 
+const boardLines = Colors.black; 
+const winnerColor = Colors.amber; 
+const uiHighlight = Colors.white12; 
+const textDim = Colors.white54; 
+const shadowColor = Colors.black54; 
 
 // --- Track & Maps ---
 const track = <Offset>[
@@ -48,10 +48,10 @@ const entryIndex = {
   'blue': 27    
 };
 
-// [FIXED] Safe Track: এখানে 8, 21, 34, 47 আছে কিনা ভালো করে দেখুন
+// [UPDATED] Safe Track: এখন স্টারগুলো ৫ নম্বর ঘরে (Index 6, 19, 32, 45) সেট করা হয়েছে
 final safeTrack = <int>{ 
-  42, 3, 16, 29, // Start Points
-  47, 8, 21, 34  // Star Points (8 number ghor)
+  42, 3, 16, 29, // Start Points (Arrow)
+  50, 11, 24, 37 // Star Points (Start + 8 positions)
 };
 
 // Home Stretch

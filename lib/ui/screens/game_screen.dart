@@ -6,6 +6,7 @@ import 'package:bd_ludo/ui/widgets/%20toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+
 import 'settings_sheet.dart';
 
 class GameScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    // কি-বোর্ড ফোকাস সেট করা (ডেস্কটপ/ওয়েব এর জন্য)
     WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
 
@@ -35,11 +37,12 @@ class _GameScreenState extends State<GameScreen> {
     final eng = context.watch<GameEngine>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF18191A), // ডার্ক ব্যাকগ্রাউন্ড
+      backgroundColor: const Color(0xFF18191A), // ডার্ক থিম ব্যাকগ্রাউন্ড
       body: SafeArea(
         child: Focus(
           focusNode: _focus,
           onKeyEvent: (_, e) {
+            // স্পেস বার চাপলে ডাইস রোল হবে
             if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.space) {
               if (!eng.rolled && eng.winner == null) eng.rollDice();
               return KeyEventResult.handled;
@@ -51,12 +54,12 @@ class _GameScreenState extends State<GameScreen> {
               // ১. টপ বার
               _buildTopBar(context, eng),
               
-              // ২. বোর্ড এবং প্লেয়ার
+              // ২. মেইন গেম এরিয়া (বোর্ড + প্লেয়ার)
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final size = constraints.biggest;
-                    final boardSize = size.shortestSide * 0.95;
+                    final boardSize = size.shortestSide * 0.95; // স্ক্রিনের ৯৫% সাইজ নিবে
                     
                     return Center(
                       child: SizedBox(
@@ -67,12 +70,12 @@ class _GameScreenState extends State<GameScreen> {
                           clipBehavior: Clip.none,
                           children: [
                             
-                            // --- বোর্ড ক্যানভাস ---
+                            // --- লুডু বোর্ড (Canvas) ---
                             Positioned.fill(
                               child: _buildBoardCanvas(context, eng),
                             ),
 
-                            // --- ৪টি প্লেয়ার প্রোফাইল ---
+                            // --- ৪টি প্লেয়ার প্রোফাইল (চার কোণায়) ---
                             
                             // Red (Top-Left)
                             if (eng.players.isNotEmpty)
@@ -118,7 +121,7 @@ class _GameScreenState extends State<GameScreen> {
                                 ),
                               ),
 
-                            // --- উইনার ডায়ালগ ---
+                            // --- উইনার ডায়ালগ (খেলা শেষ হলে দেখাবে) ---
                             if (eng.winner != null)
                               Container(
                                 decoration: BoxDecoration(
@@ -153,7 +156,7 @@ class _GameScreenState extends State<GameScreen> {
                 ),
               ),
 
-              // ৩. বটম স্ট্যাটাস
+              // ৩. বটম স্ট্যাটাস বার
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
@@ -181,17 +184,19 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  // বোর্ড ড্রয়িং এবং টাচ হ্যান্ডেলিং উইজেট
   Widget _buildBoardCanvas(BuildContext context, GameEngine eng) {
     return LayoutBuilder(
       builder: (_, constraints) {
         return GestureDetector(
           onTapUp: (details) => _handleBoardTap(details, constraints.maxWidth, eng),
           child: CustomPaint(
-            // [FIXED] এখানে 'tokenDraw' প্যারামিটারটি মুছে ফেলা হয়েছে কারণ নতুন Painter এ এটি নেই
+            // [FIXED] নতুন Painter এ 'tokenDraw' নেই, তাই বাদ দেওয়া হয়েছে
             painter: BoardPainter(
               players: eng.players,
               movable: eng.movable,
               lastDice: eng.dice,
+              // animTokenIndex এবং animValue চাইলে ভবিষ্যতে অ্যানিমেশনের জন্য দিতে পারেন
             ),
             child: Container(),
           ),
@@ -200,34 +205,35 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  // টাচ লজিক: স্ক্রিনে ট্যাপ করলে কড়ি মুভ হবে
   void _handleBoardTap(TapUpDetails details, double boardWidth, GameEngine eng) {
     if (!eng.rolled || eng.moving || eng.winner != null) return;
 
-    final double cellSize = boardWidth / 15.0;
+    final double cellSize = boardWidth / 15.0; // ১৫x১৫ গ্রিড
     final int x = (details.localPosition.dx / cellSize).floor();
     final int y = (details.localPosition.dy / cellSize).floor();
 
     final currentPlayer = eng.cur();
     
-    // Check all tokens of current player
+    // বর্তমান প্লেয়ারের সব কড়ি চেক করা
     for (int i = 0; i < currentPlayer.tokens.length; i++) {
       final t = currentPlayer.tokens[i];
       if (t.finished) continue;
 
       Offset tokenPos;
       
-      // Determine position
+      // কড়ির পজিশন বের করা
       if (t.pos == -1) {
-        tokenPos = homeYard[currentPlayer.color]![i]; 
+        tokenPos = homeYard[currentPlayer.color]![i]; // বক্সে থাকলে
       } else if (t.pos >= 100) {
         int step = t.pos - 100;
         if(step > 5) step = 5;
-        tokenPos = homeStretch[currentPlayer.color]![step];
+        tokenPos = homeStretch[currentPlayer.color]![step]; // পাকা ঘরে থাকলে
       } else {
-        tokenPos = track[t.pos];
+        tokenPos = track[t.pos]; // রাস্তায় থাকলে
       }
 
-      // Hit detection
+      // ট্যাপটি কি এই কড়ির উপর পড়েছে? (একটু টলারেন্স বা মার্জিন রাখা হয়েছে 0.8)
       if ((tokenPos.dx - x).abs() < 0.8 && (tokenPos.dy - y).abs() < 0.8) {
         if (eng.movable.contains(i)) {
           eng.moveToken(i);
@@ -239,6 +245,7 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  // টপ বার উইজেট
   Widget _buildTopBar(BuildContext context, GameEngine eng) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -269,6 +276,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 }
 
+// প্লেয়ার প্রোফাইল উইজেট (নাম + ডাইস)
 class _PlayerProfile extends StatelessWidget {
   final GameEngine eng;
   final int playerIndex;
@@ -284,7 +292,7 @@ class _PlayerProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     final player = eng.players[playerIndex];
     final isTurn = eng.turn == playerIndex;
-    final color = colorOf(player.color);
+    final color = colorOf(player.color); // colorOf ফাংশনটি constants.dart থেকে আসছে
 
     return Padding(
       padding: const EdgeInsets.all(12.0), 
@@ -292,7 +300,7 @@ class _PlayerProfile extends StatelessWidget {
         crossAxisAlignment: alignment,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Name Badge
+          // নাম এবং আইকন বক্স
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -316,7 +324,7 @@ class _PlayerProfile extends StatelessWidget {
           
           const SizedBox(height: 8),
 
-          // Dice Area
+          // ডাইস এরিয়া (শুধুমাত্র যার চাল তার জন্য ভিজিবল)
           AnimatedOpacity(
             duration: const Duration(milliseconds: 300),
             opacity: isTurn ? 1.0 : 0.3,
@@ -334,6 +342,7 @@ class _PlayerProfile extends StatelessWidget {
                       }
                     },
                   ),
+                  // ইন্ডিকেটর (ট্যাপ করার নির্দেশক)
                   if(isTurn && !eng.rolled)
                     Positioned(
                       right: 0, bottom: 0,
