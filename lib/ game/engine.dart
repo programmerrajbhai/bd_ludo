@@ -140,6 +140,10 @@ class GameEngine extends ChangeNotifier {
     final p = cur();
     final t = p.tokens[tokenIndex];
 
+    // [NEW] বোনাস চালের জন্য ফ্ল্যাগ (Capture or Finish)
+    bool captured = false;
+    bool justFinished = false;
+
     // STEP animation speed
     final stepDelay = settings.diceSpeed == 'fast'
         ? 45
@@ -198,7 +202,10 @@ class GameEngine extends ChangeNotifier {
           await stepTick();
         }
 
-        if (t.pos == 105) t.finished = true;
+        if (t.pos == 105) {
+          t.finished = true;
+          justFinished = true; // [NEW] এই চালই উইন হয়েছে
+        }
       }
     } else if (t.pos >= 100 && t.pos <= 105) {
       // already in home stretch
@@ -221,7 +228,10 @@ class GameEngine extends ChangeNotifier {
         await stepTick();
       }
 
-      if (t.pos == 105) t.finished = true;
+      if (t.pos == 105) {
+        t.finished = true;
+        justFinished = true; // [NEW] এই চালই উইন হয়েছে
+      }
     }
 
     // ----------- Capture logic -----------
@@ -235,6 +245,7 @@ class GameEngine extends ChangeNotifier {
           if (!ot.finished && ot.pos == t.pos) {
             ot.pos = -1;
             await Sfx.capture(settings.soundOn);
+            captured = true; // [NEW] কড়ি কাটা পড়েছে
           }
         }
       }
@@ -253,8 +264,8 @@ class GameEngine extends ChangeNotifier {
       return;
     }
 
-    // ----------- Extra turn on 6 -----------
-    if (dice == 6) {
+    // ----------- Extra turn on 6 OR Capture OR Finish -----------
+    if (dice == 6 || captured || justFinished) {
       // reset turn state but keep same player
       rolled = false;
       dice = 0;
