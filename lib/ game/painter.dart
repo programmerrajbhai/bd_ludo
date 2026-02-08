@@ -1,184 +1,230 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'constants.dart';
+import 'models.dart';
 
 class BoardPainter extends CustomPainter {
-  final List<Map<String, dynamic>> tokenDraw; 
-  final Set<int> safeCells;
+  final List<Player> players;
+  final List<int> movable;
+  final int? lastDice;
+  final int animTokenIndex;
+  final double animValue;
 
   BoardPainter({
-    required this.tokenDraw,
-    required this.safeCells,
+    required this.players,
+    required this.movable,
+    this.lastDice,
+    this.animTokenIndex = -1,
+    this.animValue = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final s = size.shortestSide;
-    final cell = s / 15; // 15x15 Grid standard
-
-    // 1. White Background Base
-    final bgPaint = Paint()..color = Colors.white;
-    canvas.drawRect(Rect.fromLTWH(0, 0, s, s), bgPaint);
-
-    // 2. Draw Colored Homes (4 Corners)
-    _drawHomeBase(canvas, cell, 0, 0, red);       // Top-Left (Red)
-    _drawHomeBase(canvas, cell, 9, 0, green);     // Top-Right (Green)
-    _drawHomeBase(canvas, cell, 0, 9, blue);      // Bottom-Left (Blue)
-    _drawHomeBase(canvas, cell, 9, 9, yellow);    // Bottom-Right (Yellow)
-
-    // 3. Draw Grid Lines (Black Thin Lines)
-    final linePaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    // Drawing the main cross tracks borders
-    // Vertical Tracks
-    canvas.drawRect(Rect.fromLTWH(6*cell, 0, 3*cell, 6*cell), linePaint); // Top
-    canvas.drawRect(Rect.fromLTWH(6*cell, 9*cell, 3*cell, 6*cell), linePaint); // Bottom
-    // Horizontal Tracks
-    canvas.drawRect(Rect.fromLTWH(0, 6*cell, 6*cell, 3*cell), linePaint); // Left
-    canvas.drawRect(Rect.fromLTWH(9*cell, 6*cell, 6*cell, 3*cell), linePaint); // Right
+    final double cellSize = size.width / 15.0;
     
-    // Draw internal cells
-    _drawCells(canvas, cell, linePaint);
+    // Background
+    final Paint bgPaint = Paint()..color = boardBase;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
-    // 4. Draw Colored Paths (Home Stretches - The "Red/Green Lines")
-    _fillPath(canvas, cell, 1, 7, 5, 1, red);    // Red Strip
-    _fillPath(canvas, cell, 7, 1, 1, 5, green);  // Green Strip
-    _fillPath(canvas, cell, 7, 9, 1, 5, blue);   // Blue Strip
-    _fillPath(canvas, cell, 9, 7, 5, 1, yellow); // Yellow Strip
+    _drawStations(canvas, cellSize);
+    _drawTracks(canvas, cellSize);
+    _drawCenter(canvas, cellSize);
+    _drawTokens(canvas, cellSize);
+  }
 
-    // 5. Center Triangle (Winner's Spot)
-    _drawCenter(canvas, cell);
+  void _drawStations(Canvas canvas, double s) {
+    _drawYard(canvas, s, 0, 0, red);
+    _drawYard(canvas, s, 9, 0, green);
+    _drawYard(canvas, s, 0, 9, blue);
+    _drawYard(canvas, s, 9, 9, yellow);
+  }
 
-    // 6. Start Squares (Highlight the starting box on track)
-    _fillCell(canvas, cell, 1, 6, red);
-    _fillCell(canvas, cell, 8, 1, green);
-    _fillCell(canvas, cell, 6, 13, blue);
-    _fillCell(canvas, cell, 13, 8, yellow);
+  void _drawYard(Canvas canvas, double s, double col, double row, Color color) {
+    final Paint boxPaint = Paint()..color = color;
+    canvas.drawRect(Rect.fromLTWH(col * s, row * s, 6 * s, 6 * s), boxPaint);
 
-    // 7. Safe Stars
-    // Manually placing stars on standard safe spots
-    _drawStar(canvas, cell, 2, 6); // Red safe
-    _drawStar(canvas, cell, 6, 2); // Green safe
-    _drawStar(canvas, cell, 8, 12); // Blue safe
-    _drawStar(canvas, cell, 12, 8); // Yellow safe
+    final Paint whitePaint = Paint()..color = Colors.white;
+    final Rect innerRect = Rect.fromLTWH((col + 0.8) * s, (row + 0.8) * s, 4.4 * s, 4.4 * s);
+    canvas.drawRRect(RRect.fromRectAndRadius(innerRect, Radius.circular(s * 0.5)), whitePaint);
     
-    // 8. Draw Tokens (Guti)
-    for (final t in tokenDraw) {
-      final col = t['color'] as Color;
-      final x = t['x'] as double;
-      final y = t['y'] as double;
-      final glow = (t['glow'] ?? false) as bool;
-      _drawToken(canvas, Offset((x + .5) * cell, (y + .5) * cell), cell * .35, col, glow);
+    final Paint borderPaint = Paint()..color = Colors.black12..style = PaintingStyle.stroke..strokeWidth = 2;
+    canvas.drawRRect(RRect.fromRectAndRadius(innerRect, Radius.circular(s * 0.5)), borderPaint);
+
+    _drawYardCircle(canvas, s, col + 1.5, row + 1.5, color);
+    _drawYardCircle(canvas, s, col + 3.5, row + 1.5, color);
+    _drawYardCircle(canvas, s, col + 1.5, row + 3.5, color);
+    _drawYardCircle(canvas, s, col + 3.5, row + 3.5, color);
+  }
+
+  void _drawYardCircle(Canvas canvas, double s, double x, double y, Color color) {
+    final Paint p = Paint()..color = color;
+    canvas.drawCircle(Offset((x + 0.5) * s, (y + 0.5) * s), s * 0.35, p);
+  }
+
+  void _drawTracks(Canvas canvas, double s) {
+    final Paint linePaint = Paint()..color = boardLines..style = PaintingStyle.stroke..strokeWidth = 1.0;
+    final Paint cellFill = Paint()..style = PaintingStyle.fill;
+
+    for (int i = 0; i < track.length; i++) {
+      Offset p = track[i];
+      Rect cellRect = Rect.fromLTWH(p.dx * s, p.dy * s, s, s);
+
+      cellFill.color = Colors.white; 
+      canvas.drawRect(cellRect, cellFill);
+      canvas.drawRect(cellRect, linePaint);
+
+      if (safeTrack.contains(i)) {
+        Color? safeColor;
+        if (i == startIndex['red']) safeColor = red;
+        else if (i == startIndex['green']) safeColor = green;
+        else if (i == startIndex['yellow']) safeColor = yellow;
+        else if (i == startIndex['blue']) safeColor = blue;
+        
+        if (safeColor != null) {
+          cellFill.color = safeColor;
+          canvas.drawRect(cellRect, cellFill);
+          canvas.drawRect(cellRect, linePaint);
+        }
+        
+        // [IMPORTANT] এখানে 8, 21, 34, 47 দিয়ে চেক করা হচ্ছে
+        if ([8, 21, 34, 47].contains(i)) {
+           cellFill.color = Colors.grey.withOpacity(0.3); 
+           canvas.drawRect(cellRect, cellFill);
+           canvas.drawRect(cellRect, linePaint);
+           _drawStar(canvas, cellRect.center, s * 0.4, Colors.grey[700]!);
+        }
+      }
     }
+
+    homeStretch.forEach((key, offsets) {
+      Color c = colorOf(key);
+      for (var off in offsets) {
+        Rect cellRect = Rect.fromLTWH(off.dx * s, off.dy * s, s, s);
+        cellFill.color = c;
+        canvas.drawRect(cellRect, cellFill);
+        canvas.drawRect(cellRect, linePaint);
+      }
+    });
+
+    _drawArrow(canvas, track[startIndex['red']!] * s, s, Colors.white, Icons.arrow_forward);
+    _drawArrow(canvas, track[startIndex['green']!] * s, s, Colors.white, Icons.arrow_downward);
+    _drawArrow(canvas, track[startIndex['yellow']!] * s, s, Colors.white, Icons.arrow_back);
+    _drawArrow(canvas, track[startIndex['blue']!] * s, s, Colors.white, Icons.arrow_upward);
   }
 
-  void _drawHomeBase(Canvas c, double cell, int x, int y, Color color) {
-    // Large colored box
-    c.drawRect(Rect.fromLTWH(x*cell, y*cell, 6*cell, 6*cell), Paint()..color = color);
-    
-    // Inner white box
-    c.drawRect(Rect.fromLTWH((x+1)*cell, (y+1)*cell, 4*cell, 4*cell), Paint()..color = Colors.white);
-
-    // 4 Token Circles inside
-    final circlePaint = Paint()..color = color;
-    final borderPaint = Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 1;
-    
-    List<Offset> spots = [
-       Offset((x+1.5)*cell, (y+1.5)*cell),
-       Offset((x+4.5)*cell, (y+1.5)*cell),
-       Offset((x+1.5)*cell, (y+4.5)*cell),
-       Offset((x+4.5)*cell, (y+4.5)*cell),
-    ];
-
-    for(var s in spots) {
-      c.drawCircle(s, cell*0.6, Paint()..color = Colors.white); // Circle bg
-      c.drawCircle(s, cell*0.6, borderPaint); // Circle border
-      c.drawCircle(s, cell*0.4, circlePaint); // Inner color
+  void _drawStar(Canvas canvas, Offset center, double radius, Color color) {
+    final Paint paint = Paint()..color = color..style = PaintingStyle.fill;
+    final Path path = Path();
+    for (int i = 0; i < 10; i++) {
+      double angle = (i * 36 - 90) * math.pi / 180;
+      double r = (i % 2 == 0) ? radius : radius * 0.4;
+      double x = center.dx + r * math.cos(angle);
+      double y = center.dy + r * math.sin(angle);
+      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
     }
-  }
-
-  void _fillPath(Canvas c, double cell, int x, int y, int w, int h, Color color) {
-    c.drawRect(Rect.fromLTWH(x*cell, y*cell, w*cell, h*cell), Paint()..color = color);
-    
-    // Draw grid lines over the color
-    final p = Paint()..color = Colors.black..style = PaintingStyle.stroke..strokeWidth = 1;
-    for(int i=0; i<=w; i++) c.drawLine(Offset((x+i)*cell, y*cell), Offset((x+i)*cell, (y+h)*cell), p);
-    for(int i=0; i<=h; i++) c.drawLine(Offset(x*cell, (y+i)*cell), Offset((x+w)*cell, (y+i)*cell), p);
-  }
-
-  void _fillCell(Canvas c, double cell, int x, int y, Color color) {
-    c.drawRect(Rect.fromLTWH(x*cell, y*cell, cell, cell), Paint()..color = color);
-    c.drawRect(Rect.fromLTWH(x*cell, y*cell, cell, cell), Paint()..color = Colors.black..style=PaintingStyle.stroke..strokeWidth=1);
-  }
-
-  void _drawCells(Canvas c, double cell, Paint p) {
-    // Simple loop to draw grid on tracks
-    // Top Track
-    for(int i=6; i<9; i++) for(int j=0; j<6; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
-    // Bottom Track
-    for(int i=6; i<9; i++) for(int j=9; j<15; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
-    // Left Track
-    for(int i=0; i<6; i++) for(int j=6; j<9; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
-    // Right Track
-    for(int i=9; i<15; i++) for(int j=6; j<9; j++) c.drawRect(Rect.fromLTWH(i*cell, j*cell, cell, cell), p);
-  }
-
-  void _drawCenter(Canvas c, double cell) {
-    final cx = 7.5 * cell;
-    final cy = 7.5 * cell;
-    
-    // Center Triangle Path
-    Path path = Path();
-    path.moveTo(6*cell, 6*cell);
-    path.lineTo(9*cell, 6*cell);
-    path.lineTo(9*cell, 9*cell);
-    path.lineTo(6*cell, 9*cell);
     path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  void _drawArrow(Canvas canvas, Offset pos, double s, Color color, IconData icon) {
+    Offset center = pos + Offset(s/2, s/2);
+    TextPainter textPainter = TextPainter(textDirection: TextDirection.ltr);
     
-    // Draw 4 colored triangles
-    // Red (Left)
-    c.drawPath(Path()..moveTo(cx, cy)..lineTo(6*cell, 6*cell)..lineTo(6*cell, 9*cell)..close(), Paint()..color = red);
-    // Green (Top)
-    c.drawPath(Path()..moveTo(cx, cy)..lineTo(6*cell, 6*cell)..lineTo(9*cell, 6*cell)..close(), Paint()..color = green);
-    // Yellow (Right)
-    c.drawPath(Path()..moveTo(cx, cy)..lineTo(9*cell, 6*cell)..lineTo(9*cell, 9*cell)..close(), Paint()..color = yellow);
-    // Blue (Bottom)
-    c.drawPath(Path()..moveTo(cx, cy)..lineTo(6*cell, 9*cell)..lineTo(9*cell, 9*cell)..close(), Paint()..color = blue);
+    textPainter.text = TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontSize: s * 0.7, fontFamily: icon.fontFamily, color: Colors.black26, fontWeight: FontWeight.bold));
+    textPainter.layout();
+    textPainter.paint(canvas, center - Offset(textPainter.width/2 - 1, textPainter.height/2 - 1));
 
-    // Border
-    c.drawRect(Rect.fromLTWH(6*cell, 6*cell, 3*cell, 3*cell), Paint()..style=PaintingStyle.stroke..color=Colors.black..strokeWidth=1.5);
+    textPainter.text = TextSpan(text: String.fromCharCode(icon.codePoint), style: TextStyle(fontSize: s * 0.7, fontFamily: icon.fontFamily, color: color, fontWeight: FontWeight.bold));
+    textPainter.layout();
+    textPainter.paint(canvas, center - Offset(textPainter.width/2, textPainter.height/2));
   }
 
-  void _drawStar(Canvas c, double cell, int x, int y) {
-    final cx = (x + 0.5) * cell;
-    final cy = (y + 0.5) * cell;
-    // Simple star icon using text or path
-    TextSpan span = TextSpan(style: TextStyle(color: Colors.grey[700], fontSize: cell*0.8, fontFamily: 'MaterialIcons'), text: String.fromCharCode(Icons.star.codePoint));
-    TextPainter tp = TextPainter(text: span, textDirection: TextDirection.ltr);
-    tp.layout();
-    tp.paint(c, Offset(cx - tp.width/2, cy - tp.height/2));
+  void _drawCenter(Canvas canvas, double s) {
+    Offset center = Offset(7.5 * s, 7.5 * s);
+    Offset topLeft = Offset(6 * s, 6 * s);
+    Offset topRight = Offset(9 * s, 6 * s);
+    Offset bottomLeft = Offset(6 * s, 9 * s);
+    Offset bottomRight = Offset(9 * s, 9 * s);
+
+    Paint p = Paint()..style = PaintingStyle.fill;
+
+    p.color = red;
+    Path redPath = Path()..moveTo(topLeft.dx, topLeft.dy)..lineTo(center.dx, center.dy)..lineTo(bottomLeft.dx, bottomLeft.dy)..close();
+    canvas.drawPath(redPath, p);
+
+    p.color = green;
+    Path greenPath = Path()..moveTo(topLeft.dx, topLeft.dy)..lineTo(center.dx, center.dy)..lineTo(topRight.dx, topRight.dy)..close();
+    canvas.drawPath(greenPath, p);
+
+    p.color = yellow;
+    Path yellowPath = Path()..moveTo(topRight.dx, topRight.dy)..lineTo(center.dx, center.dy)..lineTo(bottomRight.dx, bottomRight.dy)..close();
+    canvas.drawPath(yellowPath, p);
+
+    p.color = blue;
+    Path bluePath = Path()..moveTo(bottomLeft.dx, bottomLeft.dy)..lineTo(center.dx, center.dy)..lineTo(bottomRight.dx, bottomRight.dy)..close();
+    canvas.drawPath(bluePath, p);
+    
+    Paint stroke = Paint()..color = Colors.black12..style = PaintingStyle.stroke..strokeWidth = 1;
+    canvas.drawPath(redPath, stroke);
+    canvas.drawPath(greenPath, stroke);
+    canvas.drawPath(yellowPath, stroke);
+    canvas.drawPath(bluePath, stroke);
   }
 
-  void _drawToken(Canvas c, Offset center, double r, Color col, bool glow) {
-    if (glow) {
-      c.drawCircle(center, r * 1.3, Paint()..color = Colors.white.withOpacity(0.5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+  void _drawTokens(Canvas canvas, double s) {
+    Map<int, List<MapEntry<Player, Token>>> spotMap = {};
+    for (var p in players) {
+      for (var t in p.tokens) {
+        if (t.finished) continue;
+        int posKey = t.pos;
+        if (t.pos == -1) {
+           _drawSingleToken(canvas, s, p, t, homeYard[p.color]![p.tokens.indexOf(t)], 1, 0);
+        } else {
+           spotMap.putIfAbsent(posKey, () => []).add(MapEntry(p, t));
+        }
+      }
     }
-    // Shadow
-    c.drawCircle(Offset(center.dx+2, center.dy+2), r, Paint()..color = Colors.black26);
-    
-    // Main Body
-    c.drawCircle(center, r, Paint()..color = col);
-    
-    // Border
-    c.drawCircle(center, r, Paint()..style=PaintingStyle.stroke..color=Colors.white..strokeWidth=2);
-    
-    // Inner bevel highlight
-    c.drawCircle(Offset(center.dx - r*0.2, center.dy - r*0.2), r*0.3, Paint()..color = Colors.white24);
+
+    spotMap.forEach((pos, list) {
+      for (int i = 0; i < list.length; i++) {
+        var entry = list[i];
+        Offset drawPos;
+        if (pos >= 100) {
+           int step = pos - 100;
+           drawPos = homeStretch[entry.key.color]![step];
+        } else {
+           drawPos = track[pos];
+        }
+        _drawSingleToken(canvas, s, entry.key, entry.value, drawPos, list.length, i);
+      }
+    });
+  }
+
+  void _drawSingleToken(Canvas canvas, double s, Player p, Token t, Offset gridPos, int count, int index) {
+    Offset finalPos = Offset(gridPos.dx * s + s/2, gridPos.dy * s + s/2);
+    double scale = 1.0;
+    Offset offset = Offset.zero;
+
+    if (count > 1) {
+       scale = 0.6;
+       double offAmt = s * 0.2;
+       switch(index % 4) {
+         case 0: offset = Offset(-offAmt, -offAmt); break;
+         case 1: offset = Offset(offAmt, -offAmt); break;
+         case 2: offset = Offset(-offAmt, offAmt); break;
+         case 3: offset = Offset(offAmt, offAmt); break;
+       }
+    }
+
+    final Paint paint = Paint()..color = colorOf(p.color);
+    final Paint border = Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2;
+    final Paint shadow = Paint()..color = Colors.black26..maskFilter = MaskFilter.blur(BlurStyle.normal, 2);
+
+    canvas.drawCircle(finalPos + offset + Offset(1,2), s * 0.35 * scale, shadow); 
+    canvas.drawCircle(finalPos + offset, s * 0.3 * scale, paint); 
+    canvas.drawCircle(finalPos + offset, s * 0.3 * scale, border); 
   }
 
   @override
-  bool shouldRepaint(covariant BoardPainter oldDelegate) => true;
+  bool shouldRepaint(covariant BoardPainter oldDelegate) => true; 
 }

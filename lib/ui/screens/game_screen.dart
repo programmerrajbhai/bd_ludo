@@ -1,6 +1,6 @@
-import 'package:bd_ludo/%20game/painter.dart';
-import 'package:bd_ludo/%20game/engine.dart';
 import 'package:bd_ludo/%20game/constants.dart';
+import 'package:bd_ludo/%20game/engine.dart';
+import 'package:bd_ludo/%20game/painter.dart';
 import 'package:bd_ludo/ui/widgets/%20%20dice_widget.dart';
 import 'package:bd_ludo/ui/widgets/%20toast.dart';
 import 'package:flutter/material.dart';
@@ -35,7 +35,7 @@ class _GameScreenState extends State<GameScreen> {
     final eng = context.watch<GameEngine>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF18191A), // Dark Theme Background
+      backgroundColor: const Color(0xFF18191A), // ডার্ক ব্যাকগ্রাউন্ড
       body: SafeArea(
         child: Focus(
           focusNode: _focus,
@@ -48,77 +48,95 @@ class _GameScreenState extends State<GameScreen> {
           },
           child: Column(
             children: [
-              // 1. Top Bar
+              // ১. টপ বার
               _buildTopBar(context, eng),
               
-              // 2. Main Game Area
+              // ২. বোর্ড এবং প্লেয়ার
               Expanded(
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 0.65, // Portrait mode aspect ratio
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final boardSize = constraints.maxWidth * 0.90;
-                        
-                        return Stack(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final size = constraints.biggest;
+                    final boardSize = size.shortestSide * 0.95;
+                    
+                    return Center(
+                      child: SizedBox(
+                        width: boardSize,
+                        height: boardSize,
+                        child: Stack(
                           alignment: Alignment.center,
+                          clipBehavior: Clip.none,
                           children: [
-                            // --- The Ludo Board ---
-                            SizedBox(
-                              width: boardSize,
-                              height: boardSize,
-                              child: _buildBoard(context, eng),
+                            
+                            // --- বোর্ড ক্যানভাস ---
+                            Positioned.fill(
+                              child: _buildBoardCanvas(context, eng),
                             ),
 
-                            // --- 4 Players Corners ---
+                            // --- ৪টি প্লেয়ার প্রোফাইল ---
                             
-                            // Player 0 (Red) - Top Left
+                            // Red (Top-Left)
                             if (eng.players.isNotEmpty)
                               Positioned(
-                                top: 10, left: 10,
-                                child: _PlayerProfile(eng: eng, index: 0),
+                                top: 0, left: 0,
+                                child: _PlayerProfile(
+                                  eng: eng, 
+                                  playerIndex: 0, 
+                                  alignment: CrossAxisAlignment.start
+                                ),
                               ),
 
-                            // Player 1 (Green) - Top Right
+                            // Green (Top-Right)
                             if (eng.players.length > 1)
                               Positioned(
-                                top: 10, right: 10,
-                                child: _PlayerProfile(eng: eng, index: 1),
+                                top: 0, right: 0,
+                                child: _PlayerProfile(
+                                  eng: eng, 
+                                  playerIndex: 1, 
+                                  alignment: CrossAxisAlignment.end
+                                ),
                               ),
 
-                            // Player 2 (Yellow) - Bottom Right
+                            // Yellow (Bottom-Right)
                             if (eng.players.length > 2)
                               Positioned(
-                                bottom: 10, right: 10,
-                                child: _PlayerProfile(eng: eng, index: 2),
+                                bottom: 0, right: 0,
+                                child: _PlayerProfile(
+                                  eng: eng, 
+                                  playerIndex: 2, 
+                                  alignment: CrossAxisAlignment.end
+                                ),
                               ),
 
-                            // Player 3 (Blue) - Bottom Left
+                            // Blue (Bottom-Left)
                             if (eng.players.length > 3)
                               Positioned(
-                                bottom: 10, left: 10,
-                                child: _PlayerProfile(eng: eng, index: 3),
+                                bottom: 0, left: 0,
+                                child: _PlayerProfile(
+                                  eng: eng, 
+                                  playerIndex: 3, 
+                                  alignment: CrossAxisAlignment.start
+                                ),
                               ),
 
-                            // --- Winner Dialog Overlay ---
+                            // --- উইনার ডায়ালগ ---
                             if (eng.winner != null)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
                                 decoration: BoxDecoration(
-                                  color: Colors.black87,
+                                  color: Colors.black.withOpacity(0.9),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.amber, width: 3),
-                                  boxShadow: const [BoxShadow(color: Colors.black, blurRadius: 20)],
+                                  border: Border.all(color: Colors.amber, width: 2),
                                 ),
+                                padding: const EdgeInsets.all(30),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.emoji_events, color: Colors.amber, size: 50),
+                                    const Icon(Icons.emoji_events_rounded, color: Colors.amber, size: 60),
                                     const SizedBox(height: 10),
-                                    Text("WINNER: ${eng.winner}", 
-                                      style: const TextStyle(color: Colors.amber, fontSize: 22, fontWeight: FontWeight.bold)
+                                    Text(
+                                      "${eng.winner} Wins!", 
+                                      style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)
                                     ),
-                                    const SizedBox(height: 15),
+                                    const SizedBox(height: 20),
                                     ElevatedButton(
                                       onPressed: () => eng.exitGame(),
                                       style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
@@ -128,26 +146,34 @@ class _GameScreenState extends State<GameScreen> {
                                 ),
                               ),
                           ],
-                        );
-                      },
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
 
-              // 3. Bottom Status
+              // ৩. বটম স্ট্যাটাস
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                 decoration: const BoxDecoration(
-                  color: Colors.black26,
+                  color: Color(0xFF242526),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(15))
                 ),
                 child: Text(
-                  eng.winner == null ? "Turn: ${eng.cur().name}" : "Game Over",
-                  style: TextStyle( fontSize: 16, fontWeight: FontWeight.bold),
+                  eng.winner == null 
+                    ? "Current Turn: ${eng.cur().name.toUpperCase()}" 
+                    : "GAME OVER",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16, 
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2
+                  ),
                 ),
               ),
-              
             ],
           ),
         ),
@@ -155,206 +181,174 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Widget _buildBoardCanvas(BuildContext context, GameEngine eng) {
+    return LayoutBuilder(
+      builder: (_, constraints) {
+        return GestureDetector(
+          onTapUp: (details) => _handleBoardTap(details, constraints.maxWidth, eng),
+          child: CustomPaint(
+            // [FIXED] এখানে 'tokenDraw' প্যারামিটারটি মুছে ফেলা হয়েছে কারণ নতুন Painter এ এটি নেই
+            painter: BoardPainter(
+              players: eng.players,
+              movable: eng.movable,
+              lastDice: eng.dice,
+            ),
+            child: Container(),
+          ),
+        );
+      },
+    );
+  }
+
+  void _handleBoardTap(TapUpDetails details, double boardWidth, GameEngine eng) {
+    if (!eng.rolled || eng.moving || eng.winner != null) return;
+
+    final double cellSize = boardWidth / 15.0;
+    final int x = (details.localPosition.dx / cellSize).floor();
+    final int y = (details.localPosition.dy / cellSize).floor();
+
+    final currentPlayer = eng.cur();
+    
+    // Check all tokens of current player
+    for (int i = 0; i < currentPlayer.tokens.length; i++) {
+      final t = currentPlayer.tokens[i];
+      if (t.finished) continue;
+
+      Offset tokenPos;
+      
+      // Determine position
+      if (t.pos == -1) {
+        tokenPos = homeYard[currentPlayer.color]![i]; 
+      } else if (t.pos >= 100) {
+        int step = t.pos - 100;
+        if(step > 5) step = 5;
+        tokenPos = homeStretch[currentPlayer.color]![step];
+      } else {
+        tokenPos = track[t.pos];
+      }
+
+      // Hit detection
+      if ((tokenPos.dx - x).abs() < 0.8 && (tokenPos.dy - y).abs() < 0.8) {
+        if (eng.movable.contains(i)) {
+          eng.moveToken(i);
+          return;
+        } else {
+          Toasty.show(context, "Invalid Move!");
+        }
+      }
+    }
+  }
+
   Widget _buildTopBar(BuildContext context, GameEngine eng) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          InkWell(
-            onTap: () => eng.exitGame(),
-            borderRadius: BorderRadius.circular(50),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.white12, shape: BoxShape.circle),
-              child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-            ),
+          IconButton(
+            onPressed: () => eng.exitGame(),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+            style: IconButton.styleFrom(backgroundColor: Colors.white10),
           ),
-          Text(
-            "BD LUDO",
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.5),
+          const Text(
+            "LUDO PRO",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: 2),
           ),
-          InkWell(
-            onTap: () => showModalBottomSheet(
+          IconButton(
+            onPressed: () => showModalBottomSheet(
               context: context,
               backgroundColor: Colors.transparent,
               builder: (_) => const SettingsSheet(),
             ),
-            borderRadius: BorderRadius.circular(50),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.white12, shape: BoxShape.circle),
-              child: const Icon(Icons.settings, color: Colors.white),
-            ),
+            icon: const Icon(Icons.settings_rounded, color: Colors.white),
+            style: IconButton.styleFrom(backgroundColor: Colors.white10),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildBoard(BuildContext context, GameEngine eng) {
-    final draw = <Map<String, dynamic>>[];
-    
-    // Loop through players to draw tokens
-    for (int pi = 0; pi < eng.players.length; pi++) {
-      final p = eng.players[pi];
-      final col = colorOf(p.color); // Using new colorOf(int)
-
-      for (int ti = 0; ti < 4; ti++) {
-        final t = p.tokens[ti];
-        if (t.finished) continue;
-
-        Offset g;
-        // Determine Grid Position
-        if (t.pos == -1) {
-          // Inside Home Yard
-          g = homeYard[p.color]![ti]; 
-        } else if (t.pos >= 0 && t.pos < 52) {
-          // On Track
-          g = track[t.pos];
-        } else {
-          // On Home Stretch
-          final idx = (t.pos - 100).clamp(0, 5);
-          g = homeStretch[p.color]![idx];
-        }
-
-        final glow = (eng.rolled && eng.turn == pi && eng.movable.contains(ti));
-        draw.add({'color': col, 'x': g.dx, 'y': g.dy, 'glow': glow, 'pi': pi, 'ti': ti});
-      }
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white, // Board Base
-        borderRadius: BorderRadius.circular(4),
-        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 15, spreadRadius: 2)],
-      ),
-      child: LayoutBuilder(
-        builder: (_, box) {
-          final s = box.biggest.shortestSide;
-          return GestureDetector(
-            onTapUp: (d) {
-              if (!eng.rolled || eng.moving || eng.winner != null) return;
-              final local = d.localPosition;
-              final cell = s / grid;
-              final gx = (local.dx / cell).floor();
-              final gy = (local.dy / cell).floor();
-
-              for (final td in draw.reversed) {
-                if ((td['x'] as double).round() == gx && (td['y'] as double).round() == gy) {
-                  final pi = td['pi'] as int;
-                  final ti = td['ti'] as int;
-                  if (pi == eng.turn && eng.movable.contains(ti)) {
-                    eng.moveToken(ti);
-                  } else if (pi == eng.turn && eng.rolled) {
-                    Toasty.show(context, "Invalid Move");
-                  }
-                  return;
-                }
-              }
-            },
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: CustomPaint(
-                painter: BoardPainter(tokenDraw: draw, safeCells: safeTrack),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 }
 
-// --- Player Profile & Dice Widget ---
 class _PlayerProfile extends StatelessWidget {
   final GameEngine eng;
-  final int index;
+  final int playerIndex;
+  final CrossAxisAlignment alignment;
 
-  const _PlayerProfile({required this.eng, required this.index});
+  const _PlayerProfile({
+    required this.eng,
+    required this.playerIndex,
+    required this.alignment,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (index >= eng.players.length) return const SizedBox();
-
-    final player = eng.players[index];
-    final isMyTurn = eng.turn == index;
+    final player = eng.players[playerIndex];
+    final isTurn = eng.turn == playerIndex;
     final color = colorOf(player.color);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Profile Box
-        Container(
-          width: 65,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isMyTurn ? color.withOpacity(0.3) : Colors.black45,
-            borderRadius: BorderRadius.circular(12),
-            border: isMyTurn ? Border.all(color: color, width: 2) : Border.all(color: Colors.white12),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1)),
-                child: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: color,
-                  child: const Icon(Icons.person, color: Colors.white, size: 20),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                player.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 6),
-
-        // Dice Box
-        SizedBox(
-          width: 50,
-          height: 50,
-          child: IgnorePointer(
-            ignoring: !isMyTurn || eng.moving || eng.winner != null,
-            child: Stack(
-              alignment: Alignment.center,
+    return Padding(
+      padding: const EdgeInsets.all(12.0), 
+      child: Column(
+        crossAxisAlignment: alignment,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Name Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isTurn ? color.withOpacity(0.9) : Colors.black54,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isTurn ? Colors.white : Colors.transparent, width: 2),
+              boxShadow: isTurn ? [BoxShadow(color: color.withOpacity(0.6), blurRadius: 10)] : [],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Glow Animation
-                if (isMyTurn && !eng.rolled)
-                  Container(
-                    width: 50, height: 50,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: color.withOpacity(0.8), blurRadius: 15, spreadRadius: 1)],
-                    ),
-                  ),
-                
-                // The Dice
-                Opacity(
-                  opacity: isMyTurn ? 1.0 : 0.5,
-                  child: DiceWidget(
-                    value: isMyTurn ? eng.dice : (eng.turn == index ? eng.dice : 0),
-                    rolling: isMyTurn && eng.isRolling,
-                    onTap: () {
-                       if (isMyTurn && !eng.rolled && eng.winner == null) {
-                         eng.rollDice();
-                       }
-                    },
-                  ),
+                const Icon(Icons.person, color: Colors.white, size: 16),
+                const SizedBox(width: 5),
+                Text(
+                  player.name.length > 6 ? "${player.name.substring(0,6)}.." : player.name,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          
+          const SizedBox(height: 8),
+
+          // Dice Area
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            opacity: isTurn ? 1.0 : 0.3,
+            child: SizedBox(
+              width: 55,
+              height: 55,
+              child: Stack(
+                children: [
+                  DiceWidget(
+                    value: isTurn ? eng.dice : (eng.turn == playerIndex ? eng.dice : 0),
+                    rolling: isTurn && eng.isRolling,
+                    onTap: () {
+                      if (isTurn && !eng.rolled && eng.winner == null) {
+                        eng.rollDice();
+                      }
+                    },
+                  ),
+                  if(isTurn && !eng.rolled)
+                    Positioned(
+                      right: 0, bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                        child: const Icon(Icons.touch_app, size: 12, color: Colors.black),
+                      ),
+                    )
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
