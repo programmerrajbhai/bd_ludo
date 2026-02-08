@@ -1,5 +1,5 @@
-import 'package:bd_ludo/%20game/%20%20painter.dart';
-import 'package:bd_ludo/%20game/%20engine.dart';
+import 'package:bd_ludo/%20game/painter.dart';
+import 'package:bd_ludo/%20game/engine.dart';
 import 'package:bd_ludo/%20game/constants.dart';
 import 'package:bd_ludo/ui/widgets/%20%20dice_widget.dart';
 import 'package:bd_ludo/ui/widgets/%20toast.dart';

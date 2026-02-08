@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:bd_ludo/%20game/%20%20sfx.dart';
-import 'package:bd_ludo/%20game/%20models.dart';
+import 'package:bd_ludo/%20game/sfx.dart';
+import 'package:bd_ludo/%20game/models.dart';
 import 'package:flutter/foundation.dart';
 
 import 'constants.dart';
