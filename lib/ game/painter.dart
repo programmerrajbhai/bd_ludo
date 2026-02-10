@@ -33,10 +33,11 @@ class BoardPainter extends CustomPainter {
   }
 
   void _drawStations(Canvas canvas, double s) {
-    _drawYard(canvas, s, 0, 0, red);
-    _drawYard(canvas, s, 9, 0, green);
-    _drawYard(canvas, s, 0, 9, blue);
-    _drawYard(canvas, s, 9, 9, yellow);
+    // 4 Corner Yards
+    _drawYard(canvas, s, 0, 0, red);     // Top-Left (Red)
+    _drawYard(canvas, s, 9, 0, green);   // Top-Right (Green)
+    _drawYard(canvas, s, 0, 9, blue);    // Bottom-Left (Blue)
+    _drawYard(canvas, s, 9, 9, yellow);  // Bottom-Right (Yellow)
   }
 
   void _drawYard(Canvas canvas, double s, double col, double row, Color color) {
@@ -113,8 +114,7 @@ class BoardPainter extends CustomPainter {
           canvas.drawRect(cellRect, linePaint);
         }
 
-        // [UPDATED] Star Icon আঁকা (Index 6, 19, 32, 45)
-        // এটি আপনার Image 2 এর মার্ক করা ঘরের সাথে মিলবে
+        // Star Icons with slight shadow for realism
         if ([50, 11, 24, 37].contains(i)) {
           cellFill.color = Colors.grey.withOpacity(0.3);
           canvas.drawRect(cellRect, cellFill);
@@ -134,34 +134,10 @@ class BoardPainter extends CustomPainter {
       }
     });
 
-    _drawArrow(
-      canvas,
-      track[startIndex['red']!] * s,
-      s,
-      Colors.white,
-      Icons.arrow_forward,
-    );
-    _drawArrow(
-      canvas,
-      track[startIndex['green']!] * s,
-      s,
-      Colors.white,
-      Icons.arrow_downward,
-    );
-    _drawArrow(
-      canvas,
-      track[startIndex['yellow']!] * s,
-      s,
-      Colors.white,
-      Icons.arrow_back,
-    );
-    _drawArrow(
-      canvas,
-      track[startIndex['blue']!] * s,
-      s,
-      Colors.white,
-      Icons.arrow_upward,
-    );
+    _drawArrow(canvas, track[startIndex['red']!] * s, s, Colors.white, Icons.arrow_forward);
+    _drawArrow(canvas, track[startIndex['green']!] * s, s, Colors.white, Icons.arrow_downward);
+    _drawArrow(canvas, track[startIndex['yellow']!] * s, s, Colors.white, Icons.arrow_back);
+    _drawArrow(canvas, track[startIndex['blue']!] * s, s, Colors.white, Icons.arrow_upward);
   }
 
   void _drawStar(Canvas canvas, Offset center, double radius, Color color) {
@@ -320,54 +296,65 @@ class BoardPainter extends CustomPainter {
     });
   }
 
-  void _drawSingleToken(
-    Canvas canvas,
-    double s,
-    Player p,
-    Token t,
-    Offset gridPos,
-    int count,
-    int index,
-  ) {
+  // ✅ 100% Realistic 3D Token Drawing Logic (Fixed Shader Rect)
+  void _drawSingleToken(Canvas canvas, double s, Player p, Token t, Offset gridPos, int count, int index) {
     Offset finalPos = Offset(gridPos.dx * s + s / 2, gridPos.dy * s + s / 2);
     double scale = 1.0;
     Offset offset = Offset.zero;
 
     if (count > 1) {
-      scale = 0.6;
-      double offAmt = s * 0.2;
+      scale = 0.65;
+      double offAmt = s * 0.22;
       switch (index % 4) {
-        case 0:
-          offset = Offset(-offAmt, -offAmt);
-          break;
-        case 1:
-          offset = Offset(offAmt, -offAmt);
-          break;
-        case 2:
-          offset = Offset(-offAmt, offAmt);
-          break;
-        case 3:
-          offset = Offset(offAmt, offAmt);
-          break;
+        case 0: offset = Offset(-offAmt, -offAmt); break;
+        case 1: offset = Offset(offAmt, -offAmt); break;
+        case 2: offset = Offset(-offAmt, offAmt); break;
+        case 3: offset = Offset(offAmt, offAmt); break;
       }
     }
 
-    final Paint paint = Paint()..color = colorOf(p.color);
-    final Paint border = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    final Paint shadow = Paint()
-      ..color = Colors.black26
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2);
+    final center = finalPos + offset;
+    final radius = s * 0.38 * scale; 
 
+    // 1. Realistic Drop Shadow (Soft Blur)
     canvas.drawCircle(
-      finalPos + offset + Offset(1, 2),
-      s * 0.35 * scale,
-      shadow,
+      center + const Offset(2, 4),
+      radius,
+      Paint()
+        ..color = Colors.black.withOpacity(0.4)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
     );
-    canvas.drawCircle(finalPos + offset, s * 0.3 * scale, paint);
-    canvas.drawCircle(finalPos + offset, s * 0.3 * scale, border);
+
+    // 2. Main Body Gradient (3D Sphere Effect)
+    final Paint bodyPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          colorOf(p.color).withOpacity(0.9), // Lighter center
+          colorOf(p.color), // Base color
+          Colors.black.withOpacity(0.55), // Dark shadow edge
+        ],
+        stops: const [0.15, 0.5, 1.0],
+        center: const Alignment(-0.3, -0.4), // Light source from top-left
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+    canvas.drawCircle(center, radius, bodyPaint);
+
+    // 3. High Gloss Reflection (White shine on top)
+    // ✅ FIXED: Using Rect.fromCircle instead of invalid Rect.fromRectAndRadius
+    final Paint shinePaint = Paint()
+      ..shader = LinearGradient(
+        colors: [Colors.white.withOpacity(0.7), Colors.transparent],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Rect.fromCircle(center: center - Offset(radius * 0.2, radius * 0.2), radius: radius * 0.5));
+    
+    canvas.drawOval(
+      Rect.fromCenter(center: center - Offset(radius * 0.25, radius * 0.3), width: radius * 0.6, height: radius * 0.4),
+      shinePaint
+    );
+
+    // 4. Subtle Rim Light / Border
+    canvas.drawCircle(center, radius, Paint()..color = Colors.white.withOpacity(0.25)..style = PaintingStyle.stroke..strokeWidth = 0.8);
   }
 
   @override
